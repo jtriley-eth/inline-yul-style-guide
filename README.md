@@ -4,7 +4,7 @@ This is a guide for optimizooors developing EVM-based smart contracts. We use in
 
 ## Why?
 
-Coinbase has recently released a [Solidity Style Guide](https://github.com/coinabse/solidity-style-guide), which is an excellent style guide for modern Solidity smart contract development, but its [Section 1.C.4](https://github.com/coinbase/solidity-style-guide?tab=readme-ov-file#4-avoid-using-assembly) states "Avoid Using Assembly".
+Coinbase has recently released a [Solidity Style Guide](https://github.com/coinbase/solidity-style-guide), which is an excellent style guide for modern Solidity smart contract development, but its [Section 1.C.4](https://github.com/coinbase/solidity-style-guide?tab=readme-ov-file#4-avoid-using-assembly) states "Avoid Using Assembly".
 
 We believe inline assembly is not only beneficial to users who bear the cost of transaction execution against our contracts, it also improves market efficiency for sophisticated actors that are drawn to lower gas fees given comparable external variables. Sufficient testing, aesthetics, and documentation make inline assembly both viable and secure for production use cases.
 
