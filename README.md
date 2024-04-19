@@ -22,7 +22,7 @@ Variables are named in camel case with minimal abbreviations aside from well kno
 
 ### Double Whitespace
 
-Each instruction belongs on its own line and that line belongs between two blank lines. Rare exceptions may be made for brevity when operations perform closely associated actions.
+Each instruction belongs on its own line and each instruction line belongs between two blank lines. Rare exceptions may be made for brevity when operations perform simple and closely associated actions.
 
 ```solidity
 // -- snip
@@ -46,7 +46,7 @@ stop()
 
 ### Indentation
 
-Indentation should be minimized. The squint test should be applied here to minimize nesting of indentations. Shallow indentation signals brevity, clean abstractions, and simple control flow.
+Indentation should be minimized. The squint test looks at the shape of the code in relation to indentation. Shallow depth signals brevity, clean abstractions, and simple control flow.
 
 We make exceptions to convention in favor of readability, particularly with `if` statements containing only a single instruction. This exception is not appliable to `for` loops or `switch` statements.
 
@@ -60,9 +60,9 @@ if ok { stop() }
 revert(0x00, 0x00)
 ```
 
-### Avoid Excessive Variables
+### Avoid Excessive Identifiers
 
-Convention prefers variables over magic values for readability, though this can get in the way of clean inline assembly and add unnecessary lines of code, imports, and indirection.
+Convention prefers variable identifiers over magic values for readability, though this can get in the way of clean inline assembly and add unnecessary lines of code, identifiers, imports, and indirection.
 
 Common exceptions to the excessive variables rule are:
 
@@ -73,7 +73,7 @@ Common exceptions to the excessive variables rule are:
 
 However, other cases such as selectors, unknown offsets and pointers, and unusual literals should be assigned to constants when possible.
 
-> Note that Solidity limits constants that can be used in Yul to be literals. Creating a constant out of a keccak hash only works if you specify the literal, not call the keccak function. We hope this changes in the future.
+> Note that Solidity limits constants that can be used in Yul to be literals. Creating a constant out of a keccak hash only works if we specify the literal, not call the keccak function. Ideally this changes in the future.
 
 ```solidity
 uint256 constant balanceOfSelector = 0x70a0823100000000000000000000000000000000000000000000000000000000;
@@ -95,14 +95,16 @@ return(0x00, 0x20)
 
 ### Instruction Composition
 
-When instructions depend on the output of other instructions it is natural to want to nest them inside one another. This is a problem because when the line length would overflow, we break it into multiple lines, hurting readability and unnecessarily increasing indention. Additionally, instruction arguments are evaluated form right to left, which makes code difficult to reason about when instructions perform side effects.
+When instructions depend on the output of other instructions it is natural to want to nest them inside one another. This is a problem because when the line length would overflow, we break it into multiple lines, hurting readability and unnecessarily increasing indention. Additionally, instruction arguments are evaluated from right to left, which makes code difficult to reason about when instructions perform side effects.
 
 Consider a snippet from a common `SafeTransferLib` implementation:
 
 ```solidity
 // -- snip
 success := and(
+    // evaluated second
     or(and(eq(mload(0), 1), gt(returndatasize(), 31)), iszero(returndatasize())),
+    // evaluated first
     call(gas(), token, 0, freeMemoryPointer, 68, 0, 32)
 )
 // -- snip
@@ -120,7 +122,7 @@ let returnedNothing := iszero(returndatasize())
 success := and(success, or(returnedTrue, returnedNothing))
 ```
 
-Known optimizer rules also allow for more aesthetic code. This is especially applicable when using basic arithmetic, the compiler checks for mathematical optimizations at compile time, giving zero code aesthetics.
+Known optimizer rules also allow for more aesthetic code. This is especially applicable when using basic arithmetic, the compiler checks for mathematical optimizations at compile time, giving zero cost aesthetics.
 
 ```solidity
 let fmp := mload(0x40)
@@ -157,9 +159,33 @@ for { } 0x01 { } {
 }
 ```
 
-### Document The Shit Out of Everything
+### Deferred Abstraction
 
-Documentation is one of the most important components in writing inline assembly. Clear documentation should be associated with every line of assembly. However, the way documentation is written is also important. Interleaving lines of code with lines of documentation interrupts the flow of reading each. But grouping each together makes for a clean one to one mapping without interrupting the flow.
+When modularizing code with inline assembly for internal logic, abstractions such as arithmetic checks and constraints should be decomposed as often as possible. Convention prefers redundant checks but the EVM is still a resource constrained environment. The developer must understand the code they write more thoroughly, but decomposition and deferred abstractions allow the developer to choose when assumptions may be made and when checks must be performed.
+
+```solidity
+type Number is uint8;
+
+using { add as +, boundCheck } for Number global;
+
+function add(Number lhs, Number rhs) pure returns (Number output) {
+    assembly {
+        output := add(lhs, rhs)
+    }
+}
+
+function boundCheck(Number lhs) pure returns (bool output) {
+    assembly {
+        output := gt(lhs, 0xff)
+    }
+}
+```
+
+### Document The Hell Out of Everything
+
+Documentation is one of the most important components in writing inline assembly by a wide margin. Clear documentation should be associated with every line of assembly. However, the way documentation is written is also important. Interleaving lines of code with lines of documentation interrupts the flow of reading each. Grouping each together makes for a clean one to one mapping without interrupting the flow.
+
+> Grouping is preferred, but exceptions may be made such that documentation and code should be interleaved when the code is unusually long.
 
 ```solidity
 // -- snip
@@ -189,13 +215,21 @@ function totalSupply(ERC20 erc20) view returns (uint256 output) {
 
 ## Testing
 
-Inline assembly performs next to no implicit behavior. No checks are performed on the code, so we have to check everything for it.
+Inline assembly performs next to no implicit behavior. No checks are performed implicitly, so we have to check everything for it.
 
 A unit test should cover each:
 
 - branch of code
-- invalid arithmetic
-- invalid data location access
+- arithmetic edge case
+  - overflow
+  - underflow
+  - operation with zero
+- data location edge case
+  - returndata
+  - calldata
+  - memory
+  - storage
+  - transient storage
 
 A fuzz test should cover every entry point with each unit test's cases taken into account.
 
@@ -208,5 +242,5 @@ function testTotalSupplyThrows() {}
 
 function testTotalSupplyInvalidReturndatasize() {}
 
-function testFuzzTotalSupply(bool exists, bool shouldThrow, bool shouldReturnValidData) {}
+function testFuzzTotalSupply(bool exists, bool shouldThrow, uint32 returnDataSize, uint256 supply) {}
 ```
